@@ -69,6 +69,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("desktop locator prefers desktop inferred from current cli path", DesktopLocatorPrefersCliInferredDesktopTest),
     ("desktop locator prefers latest packaged Codex version", DesktopLocatorPrefersLatestPackagedVersionTest),
     ("desktop locator detects packaged Codex without configured path", DesktopLocatorDetectsPackagedVersionWithoutConfiguredPathTest),
+    ("runtime path refresher updates stale Codex Desktop package path", RuntimePathRefresherUpdatesStaleDesktopPathTest),
     ("startup command resolver keeps single-instance launch semantics", StartupCommandResolverTest),
     ("single instance service forwards args to primary process", SingleInstanceForwardingTest),
     ("launch service skips process start when write only", LaunchServiceWriteOnlyTest),
@@ -81,6 +82,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("desktop process service falls back when terminate no-ops", CodexDesktopProcessServiceForceTerminateFallbackTest),
     ("desktop process service force terminates tracked pids only", CodexDesktopProcessServiceForceTerminateTrackedPidsOnlyTest),
     ("app config persists manual account order", AppConfigManualOrderTest),
+    ("app config migrates legacy default model settings", AppConfigMigratesLegacyModelSettingsTest),
     ("app config persists overlay startup preference", AppConfigOverlayStartupPreferenceTest),
     ("app config persists restart confirmation suppression", AppConfigRestartConfirmationSuppressionTest),
     ("app config persists account card density preference", AppConfigAccountCardDensityPreferenceTest),
@@ -249,6 +251,12 @@ static async Task CompatibleActivationTest()
     await secrets.WriteSecretAsync("api-key:test:default", "sk-test");
     var config = new AppConfig
     {
+        ModelSettings = new ModelSettings
+        {
+            Model = "gpt-5",
+            ReviewModel = "gpt-5",
+            ModelReasoningEffort = "medium"
+        },
         Providers =
         [
             new ProviderDefinition
@@ -283,6 +291,7 @@ static async Task CompatibleActivationTest()
     var configText = await File.ReadAllTextAsync(Path.Combine(codexHome, "config.toml"));
     var authText = await File.ReadAllTextAsync(Path.Combine(codexHome, "auth.json"));
     AssertContains(configText, "unknown = \"preserve\"");
+    AssertDefaultModelSettings(configText);
     AssertContains(configText, "model_provider = \"openai\"");
     AssertContains(configText, "openai_base_url = \"https://example.test/v1\"");
     AssertDoesNotContain(configText, "[model_providers.openai]");
@@ -476,6 +485,8 @@ static async Task OAuthActivationWritesLastRefreshTest()
     });
 
     AssertTrue(result.ValidationPassed, result.Message);
+    var configText = await File.ReadAllTextAsync(Path.Combine(codexHome, "config.toml"));
+    AssertDefaultModelSettings(configText);
     using var auth = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(codexHome, "auth.json")));
     var root = auth.RootElement;
     AssertEqual("chatgpt", root.GetProperty("auth_mode").GetString());
@@ -1336,6 +1347,32 @@ static Task DesktopLocatorDetectsPackagedVersionWithoutConfiguredPathTest()
     return Task.CompletedTask;
 }
 
+static Task RuntimePathRefresherUpdatesStaleDesktopPathTest()
+{
+    using var temp = TempDir.Create();
+    var windowsAppsRoot = Path.Combine(temp.Path, "WindowsApps");
+    var staleDesktop = CreateFakeDesktopExecutable(windowsAppsRoot, "OpenAI.Codex_26.409.7971.0_x64__2p2nqsd0c76g0");
+    var latestDesktop = CreateFakeDesktopExecutable(windowsAppsRoot, "OpenAI.Codex_26.415.1938.0_x64__2p2nqsd0c76g0");
+    var locator = new CodexDesktopLocator(
+        windowsAppsRoots: [windowsAppsRoot],
+        localAppData: temp.Path,
+        programFiles: Path.Combine(temp.Path, "ProgramFiles"),
+        programFilesX86: Path.Combine(temp.Path, "ProgramFilesX86"),
+        pathEnvironment: string.Empty);
+    var config = new AppConfig
+    {
+        Settings = new AppSettings
+        {
+            CodexDesktopPath = staleDesktop
+        }
+    };
+
+    var refreshed = CodexRuntimePathRefresher.RefreshCodexDesktopPath(config, locator);
+
+    AssertEqual(latestDesktop, refreshed.Settings.CodexDesktopPath);
+    return Task.CompletedTask;
+}
+
 static async Task LaunchServiceWriteOnlyTest()
 {
     var launcher = new FakeProcessLauncher();
@@ -1689,6 +1726,26 @@ static async Task AppConfigManualOrderTest()
 
     var loaded = await store.LoadAsync();
     AssertEqual(7, loaded.Accounts.Single().ManualOrder);
+}
+
+static async Task AppConfigMigratesLegacyModelSettingsTest()
+{
+    using var temp = TempDir.Create();
+    var store = new AppConfigStore(Path.Combine(temp.Path, "config.json"));
+    await store.SaveAsync(new AppConfig
+    {
+        ModelSettings = new ModelSettings
+        {
+            Model = "gpt-5",
+            ReviewModel = "gpt-5",
+            ModelReasoningEffort = "medium"
+        }
+    });
+
+    var loaded = await store.LoadAsync();
+    AssertEqual(ModelSettings.DefaultModel, loaded.ModelSettings.Model);
+    AssertEqual(ModelSettings.DefaultReviewModel, loaded.ModelSettings.ReviewModel);
+    AssertEqual(ModelSettings.DefaultModelReasoningEffort, loaded.ModelSettings.ModelReasoningEffort);
 }
 
 static Task OpenAiOAuthAccountKeyAvoidsSharedAccountIdCollisionTest()
@@ -3092,6 +3149,13 @@ static void AssertDoesNotContain(string text, string value)
     {
         throw new Exception($"Expected text not to contain {value}.");
     }
+}
+
+static void AssertDefaultModelSettings(string configText)
+{
+    AssertContains(configText, $"model = \"{ModelSettings.DefaultModel}\"");
+    AssertContains(configText, $"review_model = \"{ModelSettings.DefaultReviewModel}\"");
+    AssertContains(configText, $"model_reasoning_effort = \"{ModelSettings.DefaultModelReasoningEffort}\"");
 }
 
 static void AssertSequenceEqual(IReadOnlyList<string> expected, IReadOnlyList<string> actual)

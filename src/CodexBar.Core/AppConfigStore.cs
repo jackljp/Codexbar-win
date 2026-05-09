@@ -28,7 +28,7 @@ public sealed class AppConfigStore
 
         await using var stream = File.OpenRead(_path);
         var config = await JsonSerializer.DeserializeAsync<AppConfig>(stream, JsonOptions, cancellationToken);
-        return config ?? DefaultConfig();
+        return Normalize(config ?? DefaultConfig());
     }
 
     public async Task SaveAsync(AppConfig config, CancellationToken cancellationToken = default)
@@ -68,5 +68,11 @@ public sealed class AppConfigStore
             Providers = [openAiProvider]
         };
     }
+
+    private static AppConfig Normalize(AppConfig config)
+        => config with
+        {
+            ModelSettings = (config.ModelSettings ?? new ModelSettings()).NormalizeDefaults()
+        };
 }
 

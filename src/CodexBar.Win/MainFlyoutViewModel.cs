@@ -272,6 +272,7 @@ public sealed class MainFlyoutViewModel : INotifyPropertyChanged
     public async Task<CodexDesktopProcessStatus> GetCodexDesktopStatusAsync()
     {
         var config = await _appConfigStore.LoadAsync();
+        config = await RefreshRuntimePathsAsync(config);
         return new CodexDesktopProcessService().GetStatus(config.Settings.CodexDesktopPath);
     }
 
@@ -1081,6 +1082,7 @@ public sealed class MainFlyoutViewModel : INotifyPropertyChanged
     private async Task<AppConfig> LoadHydratedConfigAsync(TimeSpan officialUsageMinRefreshInterval, bool refreshOfficialUsage)
     {
         var config = await _appConfigStore.LoadAsync();
+        config = await RefreshRuntimePathsAsync(config);
         config = await BackfillOAuthIdentitiesAsync(config);
         config = await NormalizeManualOrderAsync(config);
 
@@ -1097,6 +1099,17 @@ public sealed class MainFlyoutViewModel : INotifyPropertyChanged
         }
 
         return await _appConfigStore.LoadAsync();
+    }
+
+    private async Task<AppConfig> RefreshRuntimePathsAsync(AppConfig config)
+    {
+        var refreshed = CodexRuntimePathRefresher.RefreshCodexDesktopPath(config);
+        if (!EqualityComparer<AppConfig>.Default.Equals(refreshed, config))
+        {
+            await _appConfigStore.SaveAsync(refreshed);
+        }
+
+        return refreshed;
     }
 
     private async Task<AppConfig> MergeOfficialUsageAccountsAsync(IEnumerable<AccountRecord> refreshedAccounts)

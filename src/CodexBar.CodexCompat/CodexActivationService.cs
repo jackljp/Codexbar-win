@@ -107,6 +107,7 @@ public sealed class CodexActivationService
 
     private static void ApplySharedConfig(CodexConfigDocument document, ModelSettings settings)
     {
+        settings = settings.NormalizeDefaults();
         document.SetString("model", settings.Model);
         document.SetString("review_model", settings.ReviewModel);
         document.SetString("model_reasoning_effort", settings.ModelReasoningEffort);

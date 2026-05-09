@@ -132,9 +132,43 @@ public sealed record CodexSelection
 
 public sealed record ModelSettings
 {
-    public string Model { get; init; } = "gpt-5";
-    public string ReviewModel { get; init; } = "gpt-5";
-    public string ModelReasoningEffort { get; init; } = "medium";
+    public const string DefaultModel = "gpt-5.5";
+    public const string DefaultReviewModel = "gpt-5.5";
+    public const string DefaultModelReasoningEffort = "xhigh";
+
+    private const string LegacyDefaultModel = "gpt-5";
+    private const string LegacyDefaultModelReasoningEffort = "medium";
+
+    public string Model { get; init; } = DefaultModel;
+    public string ReviewModel { get; init; } = DefaultReviewModel;
+    public string ModelReasoningEffort { get; init; } = DefaultModelReasoningEffort;
+
+    public ModelSettings NormalizeDefaults()
+    {
+        var model = Normalize(Model, DefaultModel);
+        var reviewModel = Normalize(ReviewModel, DefaultReviewModel);
+        var effort = Normalize(ModelReasoningEffort, DefaultModelReasoningEffort);
+
+        if (IsLegacyDefault(model, reviewModel, effort))
+        {
+            return new ModelSettings();
+        }
+
+        return this with
+        {
+            Model = model,
+            ReviewModel = reviewModel,
+            ModelReasoningEffort = effort
+        };
+    }
+
+    private static bool IsLegacyDefault(string model, string reviewModel, string effort)
+        => string.Equals(model, LegacyDefaultModel, StringComparison.OrdinalIgnoreCase) &&
+           string.Equals(reviewModel, LegacyDefaultModel, StringComparison.OrdinalIgnoreCase) &&
+           string.Equals(effort, LegacyDefaultModelReasoningEffort, StringComparison.OrdinalIgnoreCase);
+
+    private static string Normalize(string? value, string fallback)
+        => string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
 }
 
 public sealed record AppSettings

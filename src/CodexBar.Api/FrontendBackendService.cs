@@ -56,7 +56,7 @@ public sealed class FrontendBackendService
 
     public async Task<FrontendSettingsDto> GetSettingsAsync(CancellationToken cancellationToken = default)
     {
-        var config = await _appConfigStore.LoadAsync(cancellationToken);
+        var config = await LoadConfigWithRefreshedRuntimePathsAsync(cancellationToken);
         var home = _homeLocator.Resolve();
         var gatewayPreview = await BuildGatewayPreviewAsync(config, cancellationToken);
 
@@ -76,7 +76,7 @@ public sealed class FrontendBackendService
         FrontendSettingsSaveRequest request,
         CancellationToken cancellationToken = default)
     {
-        var config = await _appConfigStore.LoadAsync(cancellationToken);
+        var config = await LoadConfigWithRefreshedRuntimePathsAsync(cancellationToken);
         config = config with
         {
             Settings = config.Settings with
@@ -94,6 +94,7 @@ public sealed class FrontendBackendService
                     : OpenAiAccountMode.ManualSwitch
             }
         };
+        config = CodexRuntimePathRefresher.RefreshCodexDesktopPath(config);
 
         await _appConfigStore.SaveAsync(config, cancellationToken);
 
@@ -128,7 +129,7 @@ public sealed class FrontendBackendService
             return new FrontendCommandResult(false, "请先在主浮窗激活一个账号后再测试启动。");
         }
 
-        config = await _appConfigStore.LoadAsync(cancellationToken);
+        config = await LoadConfigWithRefreshedRuntimePathsAsync(cancellationToken);
         var launchEnvironment = await CodexLaunchEnvironmentBuilder.BuildAsync(config, _secretStore, cancellationToken);
         var settings = config.Settings with
         {
@@ -662,6 +663,7 @@ public sealed class FrontendBackendService
     private async Task<AppConfig> LoadHydratedConfigAsync(TimeSpan officialUsageMinRefreshInterval, CancellationToken cancellationToken)
     {
         var config = await _appConfigStore.LoadAsync(cancellationToken);
+        config = await RefreshRuntimePathsAndSaveAsync(config, cancellationToken);
         config = await BackfillOAuthIdentitiesAsync(config, cancellationToken);
         config = await NormalizeManualOrderAsync(config, cancellationToken);
 
@@ -673,6 +675,23 @@ public sealed class FrontendBackendService
         }
 
         return officialUsageRefresh.Config;
+    }
+
+    private async Task<AppConfig> LoadConfigWithRefreshedRuntimePathsAsync(CancellationToken cancellationToken)
+    {
+        var config = await _appConfigStore.LoadAsync(cancellationToken);
+        return await RefreshRuntimePathsAndSaveAsync(config, cancellationToken);
+    }
+
+    private async Task<AppConfig> RefreshRuntimePathsAndSaveAsync(AppConfig config, CancellationToken cancellationToken)
+    {
+        var refreshed = CodexRuntimePathRefresher.RefreshCodexDesktopPath(config);
+        if (!EqualityComparer<AppConfig>.Default.Equals(refreshed, config))
+        {
+            await _appConfigStore.SaveAsync(refreshed, cancellationToken);
+        }
+
+        return refreshed;
     }
 
     private async Task<AppConfig> BackfillOAuthIdentitiesAsync(AppConfig config, CancellationToken cancellationToken)

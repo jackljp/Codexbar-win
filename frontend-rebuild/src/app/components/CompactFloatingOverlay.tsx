@@ -34,7 +34,7 @@ export function CompactFloatingOverlay({ expanded = false, accountType = 'openai
             </div>
             
             {/* Model name - strongest element */}
-            <span className={`text-[13px] font-medium truncate ${isDark ? 'text-white' : 'text-[#1c1c1c]'}`}>GPT-4.5</span>
+            <span className={`text-[13px] font-medium truncate ${isDark ? 'text-white' : 'text-[#1c1c1c]'}`}>GPT-5.5</span>
             
             {/* Provider badge */}
             <span className={`px-1 py-0.5 text-[7px] rounded flex-shrink-0 ${
@@ -129,7 +129,7 @@ export function CompactFloatingOverlay({ expanded = false, accountType = 'openai
               </div>
               <div className="flex items-center justify-between">
                 <span className={isDark ? 'text-white/40' : 'text-[#605e5c]'}>推理强度</span>
-                <span className={`truncate ml-2 ${isDark ? 'text-white/75' : 'text-[#1c1c1c]'}`}>medium</span>
+                <span className={`truncate ml-2 ${isDark ? 'text-white/75' : 'text-[#1c1c1c]'}`}>xhigh</span>
               </div>
             </div>
           </>

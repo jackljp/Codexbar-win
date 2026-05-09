@@ -8,6 +8,12 @@ appPaths.EnsureDirectories();
 var logger = new DiagnosticLogger(appPaths);
 var appConfigStore = new AppConfigStore(appPaths.ConfigPath);
 var appConfig = await appConfigStore.LoadAsync();
+var refreshedConfig = CodexRuntimePathRefresher.RefreshCodexDesktopPath(appConfig);
+if (!EqualityComparer<AppConfig>.Default.Equals(refreshedConfig, appConfig))
+{
+    appConfig = refreshedConfig;
+    await appConfigStore.SaveAsync(appConfig);
+}
 var secretStore = new WindowsCredentialSecretStore();
 var homeLocator = new CodexHomeLocator();
 var integrityChecker = new CodexIntegrityChecker();

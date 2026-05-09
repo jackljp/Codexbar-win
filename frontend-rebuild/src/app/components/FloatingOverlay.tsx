@@ -49,7 +49,7 @@ export function FloatingOverlay({ expanded = false, accountType = 'openai' }: Fl
         {/* Model Name - Primary */}
         <div className="mb-2">
           <div className="flex items-center gap-2">
-            <span className="text-[16px] font-medium text-white">GPT-4.5</span>
+            <span className="text-[16px] font-medium text-white">GPT-5.5</span>
             <span className="px-1.5 py-0.5 text-[9px] bg-[#0078d4] text-white rounded">
               {accountType === 'openai' ? 'OpenAI' : '兼容 Provider'}
             </span>
@@ -58,7 +58,7 @@ export function FloatingOverlay({ expanded = false, accountType = 'openai' }: Fl
             )}
           </div>
           {expanded && (
-            <div className="text-[10px] text-white/50 mt-1">推理强度: medium</div>
+            <div className="text-[10px] text-white/50 mt-1">推理强度: xhigh</div>
           )}
         </div>
 

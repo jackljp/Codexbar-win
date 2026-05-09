@@ -62,6 +62,7 @@ public partial class SettingsWindow : Window
     private async Task LoadConfigAsync()
     {
         _config = await _configStore.LoadAsync();
+        await RefreshRuntimePathsAsync();
         var home = new CodexHomeLocator().Resolve();
         PathsText.Text = $"\u5E94\u7528\u72B6\u6001\u76EE\u5F55\uFF1A{_appPaths.AppRoot}\nCODEX_HOME\uFF1A{home.RootPath}";
 
@@ -107,6 +108,7 @@ public partial class SettingsWindow : Window
                 CodexCliPath = EmptyToNull(CodexCliPathBox.Text)
             }
         };
+        await RefreshRuntimePathsAsync();
 
         await _configStore.SaveAsync(_config);
         StatusText.Text = "\u5DF2\u4FDD\u5B58\u3002\u5982\u679C\u4F60\u5728\u5176\u4ED6\u5730\u65B9\u4FEE\u6539\u4E86\u8D26\u53F7\u6570\u636E\uFF0C\u8BF7\u5237\u65B0\u4E3B\u9762\u677F\u3002";
@@ -121,6 +123,16 @@ public partial class SettingsWindow : Window
         if (_settingsSaved is not null)
         {
             await _settingsSaved();
+        }
+    }
+
+    private async Task RefreshRuntimePathsAsync()
+    {
+        var refreshed = CodexRuntimePathRefresher.RefreshCodexDesktopPath(_config);
+        if (!EqualityComparer<AppConfig>.Default.Equals(refreshed, _config))
+        {
+            _config = refreshed;
+            await _configStore.SaveAsync(_config);
         }
     }
 
