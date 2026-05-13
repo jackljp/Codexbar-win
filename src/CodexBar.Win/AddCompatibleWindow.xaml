@@ -264,7 +264,7 @@
               <TextBlock Margin="0,6,0,0"
                          Foreground="#8A8886"
                          FontSize="10"
-                         Text="大多数兼容 OpenAI 的 Provider 保持默认 openai 即可，仅在需要兼容特定历史过滤逻辑时再修改。" />
+                         Text="保持默认 openai 可兼容 Codex Desktop 项目列表；切换中转站时会自动关闭 request compression。" />
             </StackPanel>
           </Expander>
         </Border>

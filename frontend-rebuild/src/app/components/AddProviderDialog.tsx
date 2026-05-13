@@ -170,7 +170,7 @@ export function AddProviderDialog({ theme = 'light', onClose, onSaved }: AddProv
                       onChange={(value) => updateField('codexProviderId', value || null)}
                     />
                     <div className={`mt-1 text-[11px] ${isDark ? 'text-white/50' : 'text-[#605e5c]'}`}>
-                      大多数兼容 OpenAI 的 API 维持 "openai" 即可。
+                      保持默认 openai 可兼容 Codex Desktop 项目列表；切换中转站时会自动关闭 request compression。
                     </div>
                   </div>
                 </div>

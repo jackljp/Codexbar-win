@@ -52,6 +52,7 @@ public sealed class CodexActivationService
         {
             configDocument.SetString("model_provider", "openai");
             configDocument.RemoveTopLevelKey("openai_base_url");
+            configDocument.RemoveSectionKey("features", "enable_request_compression");
             var tokens = await _tokenStore.ReadTokensAsync(account.CredentialRef, cancellationToken)
                 ?? throw new InvalidOperationException($"OAuth tokens are missing for {account.Label}.");
             tokens = ApplyWorkspaceContext(tokens, account);
@@ -80,7 +81,9 @@ public sealed class CodexActivationService
                 configDocument.SetSectionString(providerSection, "base_url", provider.BaseUrl);
                 configDocument.SetSectionString(providerSection, "env_key", "OPENAI_API_KEY");
                 configDocument.SetSectionString(providerSection, "wire_api", ToCodexWireApi(provider.WireApi));
+                configDocument.SetSectionBare(providerSection, "requires_openai_auth", "false");
             }
+            configDocument.SetSectionBare("features", "enable_request_compression", "false");
 
             authContent = _authStore.SerializeCompatibleApiKey(
                 apiKey,

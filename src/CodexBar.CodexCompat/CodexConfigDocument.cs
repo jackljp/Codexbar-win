@@ -32,11 +32,34 @@ public sealed class CodexConfigDocument
     public void SetSectionString(string sectionName, string key, string value)
         => SetSectionRaw(sectionName, key, Quote(value));
 
+    public void SetSectionBare(string sectionName, string key, string value)
+        => SetSectionRaw(sectionName, key, value);
+
     public void RemoveTopLevelKey(string key)
     {
         var pattern = TopLevelKeyRegex(key);
         var end = FirstSectionIndex();
         for (var i = 0; i < end; i++)
+        {
+            if (pattern.IsMatch(_lines[i]))
+            {
+                _lines.RemoveAt(i);
+                i--;
+                end--;
+            }
+        }
+    }
+
+    public void RemoveSectionKey(string sectionName, string key)
+    {
+        var pattern = TopLevelKeyRegex(key);
+        var (start, end) = FindSection(sectionName);
+        if (start < 0)
+        {
+            return;
+        }
+
+        for (var i = start + 1; i < end; i++)
         {
             if (pattern.IsMatch(_lines[i]))
             {

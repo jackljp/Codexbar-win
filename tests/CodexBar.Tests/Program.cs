@@ -30,6 +30,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("compatible activation supports custom codex provider alias", CompatibleActivationCustomProviderAliasTest),
     ("compatible activation preserves oauth identity snapshot", CompatibleActivationPreservesOAuthIdentityTest),
     ("oauth activation writes codex-compatible last_refresh", OAuthActivationWritesLastRefreshTest),
+    ("oauth activation restores official compression defaults", OAuthActivationRestoresOfficialCompressionDefaultsTest),
     ("oauth activation writes selected workspace account id", OAuthActivationWritesSelectedWorkspaceAccountIdTest),
     ("openai oauth url can restrict a workspace", OpenAiOAuthUrlCanRestrictWorkspaceTest),
     ("openai oauth token response stores chatgpt account id", OpenAiOAuthTokenResponseStoresChatGptAccountIdTest),
@@ -262,6 +263,7 @@ static async Task CompatibleActivationTest()
             new ProviderDefinition
             {
                 ProviderId = "test",
+                CodexProviderId = "openai",
                 DisplayName = "Test API",
                 Kind = ProviderKind.OpenAiCompatible,
                 AuthMode = AuthMode.ApiKey,
@@ -294,6 +296,8 @@ static async Task CompatibleActivationTest()
     AssertDefaultModelSettings(configText);
     AssertContains(configText, "model_provider = \"openai\"");
     AssertContains(configText, "openai_base_url = \"https://example.test/v1\"");
+    AssertContains(configText, "[features]");
+    AssertContains(configText, "enable_request_compression = false");
     AssertDoesNotContain(configText, "[model_providers.openai]");
     AssertDoesNotContain(configText, "[model_providers.test]");
     AssertContains(authText, "\"auth_mode\": \"apikey\"");
@@ -356,6 +360,8 @@ static async Task CompatibleActivationCustomProviderAliasTest()
     AssertContains(configText, "model_provider = \"openai-custom\"");
     AssertContains(configText, "[model_providers.openai-custom]");
     AssertContains(configText, "base_url = \"https://example.test/v1\"");
+    AssertContains(configText, "requires_openai_auth = false");
+    AssertContains(configText, "enable_request_compression = false");
     AssertDoesNotContain(configText, "openai_base_url");
 }
 
@@ -494,6 +500,74 @@ static async Task OAuthActivationWritesLastRefreshTest()
     AssertEqual("access-token", tokens.GetProperty("access_token").GetString());
     AssertTrue(root.TryGetProperty("last_refresh", out var writtenLastRefresh));
     AssertEqual(lastRefresh, writtenLastRefresh.GetDateTimeOffset());
+}
+
+static async Task OAuthActivationRestoresOfficialCompressionDefaultsTest()
+{
+    using var temp = TempDir.Create();
+    var codexHome = Path.Combine(temp.Path, ".codex");
+    Directory.CreateDirectory(codexHome);
+    await File.WriteAllTextAsync(Path.Combine(codexHome, "config.toml"), """
+        model_provider = "openai"
+        openai_base_url = "https://example.test/v1"
+
+        [features]
+        memories = true
+        enable_request_compression = false
+        """);
+
+    var appPaths = AppPaths.Resolve(new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["USERPROFILE"] = temp.Path
+    });
+    var secrets = new InMemorySecretStore();
+    await secrets.WriteTokensAsync("oauth:openai:acct", new OAuthTokens
+    {
+        AccessToken = "access-token",
+        RefreshToken = "refresh-token",
+        IdToken = "id-token",
+        AccountId = "account-id"
+    });
+    var config = new AppConfig
+    {
+        Providers =
+        [
+            new ProviderDefinition
+            {
+                ProviderId = "openai",
+                DisplayName = "OpenAI",
+                Kind = ProviderKind.OpenAiOAuth,
+                AuthMode = AuthMode.OAuth
+            }
+        ],
+        Accounts =
+        [
+            new AccountRecord
+            {
+                ProviderId = "openai",
+                AccountId = "acct",
+                Label = "Acct",
+                CredentialRef = "oauth:openai:acct"
+            }
+        ]
+    };
+
+    var result = await NewActivationService(appPaths, secrets).ActivateAsync(config, new CodexSelection
+    {
+        ProviderId = "openai",
+        AccountId = "acct"
+    }, new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["CODEX_HOME"] = codexHome,
+        ["USERPROFILE"] = temp.Path
+    });
+
+    AssertTrue(result.ValidationPassed, result.Message);
+    var configText = await File.ReadAllTextAsync(Path.Combine(codexHome, "config.toml"));
+    AssertContains(configText, "model_provider = \"openai\"");
+    AssertContains(configText, "memories = true");
+    AssertDoesNotContain(configText, "openai_base_url");
+    AssertDoesNotContain(configText, "enable_request_compression");
 }
 
 static async Task OAuthActivationWritesSelectedWorkspaceAccountIdTest()
